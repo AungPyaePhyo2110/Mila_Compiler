@@ -8,11 +8,12 @@
  */
 int Lexer::gettok()
 {
-    char c = std::cin.peek();
     std::string word = "";
 Start:
+    char c = std::cin.peek();
     if(c == EOF)
     {
+        std::cin.get();
         return tok_eof;
     }
     if(std::isspace(c))
@@ -34,6 +35,9 @@ Start:
         case '+':
             std::cin.get();
             return '+';
+        case '.':
+            std::cin.get();
+            return '.';
         case '-':
             std::cin.get();
             return '-';
@@ -43,6 +47,9 @@ Start:
         case '(':
             std::cin.get();
             return '(';
+        case ')':
+            std::cin.get();
+            return ')';
         case '[':
             std::cin.get();
             return '[';
@@ -73,7 +80,9 @@ Start:
         case '&':  
             std::cin.get();
             goto Hexa;
-
+        case '=':
+            std::cin.get();
+            return '=';
     }
 
 Decimal:
@@ -173,15 +182,16 @@ bool Lexer::isDigitCorrect(char num ,int base,int& value)
     else if (isupper(num))
         value = num - 'A' + 10;
     else 
-        return 0;
+        return false;
     if(value >= base)
-        return 0;
-    return 1;
+        return false;
+    return true;
 }
 
 int Lexer::readNumber(int base)
 {
-    m_NumVal = 0;
+    char current = std::cin.get();
+    m_NumVal = current - '0';
     while(true)
     {
         int nextValue = 0;
