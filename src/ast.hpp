@@ -17,7 +17,8 @@
 #include <map>
 
 #include <vector>
-using SymbolTable = std::map<std::string, llvm::Value *>;
+using SymbolTable = std::map<std::string, llvm::AllocaInst *>;
+using ConstantValueTable = std::map<std::string , int >;
 
 class GenContext
 {
@@ -28,6 +29,7 @@ public:
   llvm::IRBuilder<> MilaBuilder; // llvm builder
   llvm::Module MilaModule;       // llvm module
   SymbolTable symbolTable;
+  ConstantValueTable constantTable;
 };
 
 class ASTNode
@@ -57,6 +59,7 @@ public:
   VariableASTNode(const std::string &name) : m_identifier(name) {}
   llvm::Value *codegen(GenContext &gen) const override;
   virtual void print(int level = 0) const override;
+  llvm::AllocaInst * getStore(GenContext & gen) const;
 };
 
 class NumberASTNode : public ExprASTNode
@@ -104,14 +107,28 @@ public:
 class ConstantDeclarationASTNode : public StatementASTNode
 {
   std::string m_variable;
-  std::unique_ptr<ExprASTNode> m_value;
+  int m_value;
 
 public:
   ConstantDeclarationASTNode(std::string variable,
-                             std::unique_ptr<ExprASTNode> value) : m_variable(variable), m_value(std::move(value)) {}
+                             int value) : m_variable(variable), m_value(value) {}
   llvm::Value *codegen(GenContext &gen) const override;
   virtual void print(int level = 0) const override;
 };
+
+class VariableDeclarationASTNode : public StatementASTNode
+{
+  std::string m_variable;
+  std::unique_ptr<ExprASTNode> m_value;
+
+  public:
+  VariableDeclarationASTNode(std::string variable , std::unique_ptr<ExprASTNode> value):
+                      m_variable(variable),m_value(std::move(value)) {}
+  virtual void print(int level = 0 ) const override;
+  virtual llvm::Value * codegen(GenContext & ) const override;
+        
+};
+
 
 class BlockStatmentASTNode : public StatementASTNode
 {

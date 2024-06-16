@@ -11,7 +11,7 @@ bool Parser::Parse()
     // while(CurTok!=tok_eof)
     //     getNextToken();
     astRoot = parseProgram();
-    astRoot->print(1);
+    // astRoot->print(1);
     if (!astRoot)
         return false;
     return true;
@@ -31,6 +31,17 @@ std::unique_ptr<BlockStatmentASTNode> Parser::parseBlockStatement()
     }
     return std::make_unique<BlockStatmentASTNode>(std::move(expressions));
 }
+
+void Parser::parseGlobalVariableDeclarationBLock(std::vector<std::unique_ptr<StatementASTNode>>& statements)
+{
+    while(CurTok == tok_identifier)
+    {
+        std::unique_ptr<VariableDeclarationASTNode> declaration = parseVariableDeclaration();
+        statements.push_back(std::move(declaration));
+    }
+}
+
+
 
 void Parser::parseConstantDeclarationBlock(std::vector<std::unique_ptr<StatementASTNode>> &statments)
 {
@@ -177,6 +188,52 @@ std::unique_ptr<MainFunctionBlockStatementASTNode> Parser::parseMainFunctionBloc
     return std::make_unique<MainFunctionBlockStatementASTNode>(std::move(expressions));
 }
 
+std::unique_ptr<VariableASTNode> Parser::parseVariable()
+{
+    if (CurTok != tok_identifier)
+        return nullptr;
+    const std::string identitfier = m_Lexer.identifierStr();
+    getNextToken(); // eat the identitifer
+    return std::make_unique<VariableASTNode>(identitfier);
+}
+
+std::unique_ptr<NumberASTNode> Parser::parseNumber()
+{
+    if (CurTok != tok_number)
+        return nullptr;
+    int value = m_Lexer.numVal();
+    getNextToken(); // eat the number
+    return std::make_unique<NumberASTNode>(value);
+}
+
+
+std::unique_ptr<VariableDeclarationASTNode> Parser::parseVariableDeclaration()
+{
+    std::string variable = m_Lexer.identifierStr();
+    getNextToken(); // eat identifier
+    if(CurTok != ':') return nullptr;
+    getNextToken();  // eat :
+    if(CurTok != tok_integer) return nullptr;
+    getNextToken(); //eat integer
+    getNextToken(); // eat ;
+    return std::make_unique<VariableDeclarationASTNode>(variable,nullptr);
+}
+
+std::unique_ptr<ConstantDeclarationASTNode> Parser::parseConstantDeclaration()
+{
+    std::string variable = m_Lexer.identifierStr();
+    getNextToken(); // eat identifier
+    if (CurTok != '=')
+        return nullptr;
+    getNextToken(); // eat =
+    int value = m_Lexer.numVal();
+    getNextToken();
+    if (CurTok != ';')
+        return nullptr;
+    getNextToken(); // eat ;
+    return std::make_unique<ConstantDeclarationASTNode>(variable, value);
+}
+
 std::unique_ptr<ProgramASTNode> Parser::parseProgram()
 {
     if (getNextToken() != tok_program)
@@ -192,12 +249,16 @@ std::unique_ptr<ProgramASTNode> Parser::parseProgram()
     {
         if (CurTok == tok_eof)
             break;
-
+        std::cout << tokenMap[CurTok] << std::endl;
         switch (CurTok)
         {
         case tok_const:
             getNextToken(); // eat const token
             parseConstantDeclarationBlock(statements);
+            break;
+        case tok_var:
+            getNextToken(); // eat var 
+            parseGlobalVariableDeclarationBLock(statements);
             break;
         case tok_begin:
             getNextToken(); // eat begin
@@ -212,47 +273,29 @@ std::unique_ptr<ProgramASTNode> Parser::parseProgram()
     return std::make_unique<ProgramASTNode>(std::move(statements));
 }
 
-std::unique_ptr<VariableASTNode> Parser::parseVariable()
-{
-    if (CurTok != tok_identifier)
-        return nullptr;
-    const std::string identitfier = m_Lexer.identifierStr();
-    getNextToken(); // eat the identitifer
-    return std::make_unique<VariableASTNode>(identitfier);
-}
 
-std::unique_ptr<NumberASTNode> Parser::parseNumber()
-{
-    if (CurTok != tok_number)
-        return nullptr;
-    double value = m_Lexer.numVal();
-    getNextToken(); // eat the number
-    return std::make_unique<NumberASTNode>(value);
-}
-
-std::unique_ptr<ConstantDeclarationASTNode> Parser::parseConstantDeclaration()
-{
-    std::string variable = m_Lexer.identifierStr();
-    getNextToken(); // eat identifier
-    if (CurTok != '=')
-        return nullptr;
-    getNextToken(); // eat =
-    std::unique_ptr<NumberASTNode> value = parseNumber();
-    if (CurTok != ';')
-        return nullptr;
-    getNextToken(); // eat ;
-    return std::make_unique<ConstantDeclarationASTNode>(variable, std::move(value));
-}
 
 const llvm::Module &Parser::Generate()
 {
 
     // create writeln function
-    std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(gen.MilaContext));
-    llvm::FunctionType *writelnFT = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), Ints, false);
-    llvm::Function *writelnF = llvm::Function::Create(writelnFT, llvm::Function::ExternalLinkage, "writeln", gen.MilaModule);
-    for (auto &Arg : writelnF->args())
-        Arg.setName("x");
+    {
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(gen.MilaContext));
+        llvm::FunctionType *writelnFT = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), Ints, false);
+        llvm::Function *writelnF = llvm::Function::Create(writelnFT, llvm::Function::ExternalLinkage, "writeln", gen.MilaModule);
+        for (auto &Arg : writelnF->args())
+            Arg.setName("x");
+    }
+
+    
+    {
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(gen.MilaContext));
+        llvm::FunctionType *readlnFT = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), Ints, false);
+        llvm::Function *readlnF = llvm::Function::Create(readlnFT, llvm::Function::ExternalLinkage, "readln", gen.MilaModule);
+        for (auto &Arg : readlnF->args())
+            Arg.setName("x");
+    }
+
 
     astRoot->codegen(gen);
 

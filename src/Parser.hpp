@@ -75,9 +75,10 @@ private:
     void handleConstantDeclaration();
     
     void parseConstantDeclarationBlock(std::vector<std::unique_ptr<StatementASTNode>>&);
+    void parseGlobalVariableDeclarationBLock(std::vector<std::unique_ptr<StatementASTNode>>&);
 
     std::unique_ptr<ConstantDeclarationASTNode> parseConstantDeclaration();
-
+    std::unique_ptr<VariableDeclarationASTNode> parseVariableDeclaration();
     std::unique_ptr<VariableASTNode> parseVariable();
     std::unique_ptr<NumberASTNode> parseNumber();
     std::unique_ptr<ProgramASTNode> parseProgram();

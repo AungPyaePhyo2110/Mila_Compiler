@@ -76,10 +76,10 @@ Start:
             return ';';      
         case '$':
             std::cin.get();
-            goto Octa;
+            goto Hexa;
         case '&':  
             std::cin.get();
-            goto Hexa;
+            goto Octa;
         case '=':
             std::cin.get();
             return '=';
