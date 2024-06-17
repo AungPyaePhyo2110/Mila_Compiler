@@ -127,6 +127,32 @@ public:
   virtual void print(int level = 0) const override;
 };
 
+class PrototypeASTNode
+{
+  std::string m_name;
+  std::vector<std::string> m_args;
+  public:
+  PrototypeASTNode(std::string name = "main" , std::vector<std::string> args) : m_name(name) , m_args(std::move(args)) {}
+  void print(int level = 0) const;
+  const std::string & getName() { return m_name ;}
+  llvm::Function * codegen(GenContext & gen) const;
+};
+
+
+class FunctionASTNode
+{
+  std::unique_ptr<PrototypeASTNode> m_prototype;
+  std::unique_ptr<VariableDeclarationASTNode> m_variables;
+  std::unique_ptr<ConstantDeclarationASTNode> m_constants;
+  std::unique_ptr<BlockStatmentASTNode> m_body;
+  public:
+    FunctionASTNode(std::unique_ptr<PrototypeASTNode> prototype ,std::unique_ptr<VariableDeclarationASTNode> variables,
+                    std::unique_ptr<ConstantDeclarationASTNode> constants , std::unique_ptr<BlockStatmentASTNode> body):
+                    m_prototype(std::move(prototype)),m_variables(std::move(variables)),m_constants(std::move(constants)),
+                    m_body(std::move(body)) {}
+    llvm::Function codegen(GenContext & gen) const;
+};
+
 class ConstantDeclarationASTNode : public StatementASTNode
 {
   std::string m_variable;

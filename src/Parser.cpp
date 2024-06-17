@@ -139,15 +139,6 @@ std::unique_ptr<ExprASTNode> Parser::parseExpression()
     return ParseBinOpRHS(0, std::move(LHS));
 }
 
-std::unique_ptr<ExprASTNode> Parser::parseReadLnExpression()
-{
-    getNextToken(); // eat readln
-    getNextToken(); // eat (
-    std::unique_ptr<VariableASTNode> arg = parseVariable();
-    getNextToken(); // eat )
-    return std::make_unique<ReadlnExprASTNode>(std::move(arg));
-}
-
 
 std::unique_ptr<ExprASTNode> Parser::parseAssignemntExpression(const std::string identifier)
 {
@@ -169,6 +160,14 @@ std::unique_ptr<ExprASTNode> Parser::parseIdentiferExpression()
     {
         return std::make_unique<VariableASTNode>(identifier); // just a variable
     }
+    if(identifier == "readln")
+    {
+        getNextToken(); // eat (
+        std::unique_ptr<VariableASTNode> arg = parseVariable();
+        getNextToken(); // eat )
+        return std::make_unique<ReadlnExprASTNode>(std::move(arg));
+    }
+
     getNextToken(); // eat (
     std::vector<std::unique_ptr<ExprASTNode>> args;
     if (CurTok != ')')
@@ -190,7 +189,7 @@ std::unique_ptr<ExprASTNode> Parser::parseIdentiferExpression()
     return std::make_unique<FunctinoCallExprASTNode>(identifier, std::move(args));
 }
 
-std::unique_ptr<MainFunctionBlockStatementASTNode> Parser::parseMainFunctionBlock()
+std::unique_ptr<BlockStatmentASTNode> Parser::parseMainFunctionBlock()
 {
     std::vector<std::unique_ptr<ExprASTNode>> expressions;
     while (CurTok != tok_end)
@@ -203,14 +202,9 @@ std::unique_ptr<MainFunctionBlockStatementASTNode> Parser::parseMainFunctionBloc
             expressions.push_back(std::move(expression));
             getNextToken(); // eat ;
             break;
-        case tok_readln:
-            expression = parseReadLnExpression();
-            expressions.push_back(std::move(expression));
-            getNextToken();
-            break;
         }
     }
-    return std::make_unique<MainFunctionBlockStatementASTNode>(std::move(expressions));
+    return std::make_unique<BlockStatmentASTNode>(std::move(expressions));
 }
 
 std::unique_ptr<VariableASTNode> Parser::parseVariable()
@@ -272,7 +266,7 @@ void Parser::parseMainFunction(std::vector<std::unique_ptr<StatementASTNode>>& s
         break;
     case tok_begin:
         getNextToken(); // eat begin
-        std::unique_ptr<MainFunctionBlockStatementASTNode> mainBlock = parseMainFunctionBlock();
+        std::unique_ptr<BlockStatmentASTNode> mainBlock = parseMainFunctionBlock();
         statements.push_back(std::move(mainBlock));
         getNextToken(); // eat end
         getNextToken(); // eat .
@@ -290,7 +284,7 @@ std::unique_ptr<ProgramASTNode> Parser::parseProgram()
         return nullptr;
     getNextToken();
 
-    std::vector<std::unique_ptr<StatementASTNode>> statements;
+    std::vector<std::unique_ptr<FunctionASTNode>> statements;
     while (true)
     {
         if (CurTok == tok_eof)
@@ -298,7 +292,7 @@ std::unique_ptr<ProgramASTNode> Parser::parseProgram()
         switch (CurTok)
         {
         default:
-            parseMainFunction(statements);
+            std::unique_ptr<Func
         // case tok_const:
         //     getNextToken(); // eat const token
         //     parseConstantDeclarationBlock(statements);
@@ -309,7 +303,7 @@ std::unique_ptr<ProgramASTNode> Parser::parseProgram()
         //     break;
         // case tok_begin:
         //     getNextToken(); // eat begin
-        //     std::unique_ptr<MainFunctionBlockStatementASTNode> mainBlock = parseMainFunctionBlock();
+        //     std::unique_ptr<BlockStatmentASTNode> mainBlock = parseMainFunctionBlock();
         //     statements.push_back(std::move(mainBlock));
         //     getNextToken(); // eat end
         //     getNextToken(); // eat .

@@ -174,9 +174,7 @@ llvm::Value * VariableDeclarationASTNode::codegen(GenContext & gen ) const
 llvm::Value * VariableASTNode::codePtrGen(GenContext & gen) const
 {
     if(auto it = gen.symbolTable.find(m_identifier); it!=gen.symbolTable.end()){
-        llvm::AllocaInst * ptrStore = gen.MilaBuilder.CreateAlloca(llvm::Type::getInt32PtrTy(gen.MilaContext),nullptr,"ptr");
-        gen.MilaBuilder.CreateStore(it->second,ptrStore);
-        return gen.MilaBuilder.CreateLoad(llvm::Type::getInt32PtrTy(gen.MilaContext),ptrStore);
+        return it->second;
     }
     return nullptr;
 }

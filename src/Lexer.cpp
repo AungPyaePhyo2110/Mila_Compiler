@@ -165,8 +165,6 @@ Word:
         return tok_for;
     else if ( word == "do" )
         return tok_do;
-    else if ( word == "readln")
-        return tok_readln;
     else
     {
         m_IdentifierStr = word;

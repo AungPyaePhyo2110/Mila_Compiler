@@ -87,7 +87,7 @@ private:
     std::unique_ptr<NumberASTNode> parseNumber();
     std::unique_ptr<ProgramASTNode> parseProgram();
     std::unique_ptr<BlockStatmentASTNode> parseBlockStatement();
-    std::unique_ptr<MainFunctionBlockStatementASTNode> parseMainFunctionBlock();
+    std::unique_ptr<BlockStatmentASTNode> parseMainFunctionBlock();
     std::unique_ptr<ExprASTNode> parseReadLnExpression();
 std::unique_ptr<ExprASTNode> parseAssignemntExpression(const std::string identifier);
     std::unique_ptr<ExprASTNode> parseIdentiferExpression();
