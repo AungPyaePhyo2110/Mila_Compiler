@@ -32,7 +32,7 @@ std::unique_ptr<BlockStatmentASTNode> Parser::parseBlockStatement()
     return std::make_unique<BlockStatmentASTNode>(std::move(expressions));
 }
 
-void Parser::parseGlobalVariableDeclarationBLock(std::vector<std::unique_ptr<StatementASTNode>>& statements)
+void Parser::parseVariableDeclarationBLock(std::vector<std::unique_ptr<StatementASTNode>>& statements)
 {
     while(CurTok == tok_identifier)
     {
@@ -63,7 +63,7 @@ std::unique_ptr<ExprASTNode> Parser::parseParentheseExpression()
 {
     getNextToken(); // eat (
     std::unique_ptr<ExprASTNode> expression = parseExpression();
-    if (expression)
+    if (!expression)
         return nullptr;
     if (CurTok != ')')
         throw std::logic_error("Missing paranthesis");
@@ -88,8 +88,6 @@ std::unique_ptr<ExprASTNode> Parser::parsePrimary()
 
 int Parser::GetTokPrecedence()
 {
-    if (!isascii(CurTok))
-        return -1;
     int currentTokenPrecedence = BinopPrecedence[CurTok];
     if (currentTokenPrecedence <= 0)
         return -1;
@@ -138,14 +136,35 @@ std::unique_ptr<ExprASTNode> Parser::parseExpression()
     auto LHS = parsePrimary();
     if (!LHS)
         return nullptr;
-
     return ParseBinOpRHS(0, std::move(LHS));
+}
+
+std::unique_ptr<ExprASTNode> Parser::parseReadLnExpression()
+{
+    getNextToken(); // eat readln
+    getNextToken(); // eat (
+    std::unique_ptr<VariableASTNode> arg = parseVariable();
+    getNextToken(); // eat )
+    return std::make_unique<ReadlnExprASTNode>(std::move(arg));
+}
+
+
+std::unique_ptr<ExprASTNode> Parser::parseAssignemntExpression(const std::string identifier)
+{
+    std::unique_ptr<VariableASTNode> variable = std::make_unique<VariableASTNode>(identifier);
+    getNextToken(); // eat assigment;
+    std::unique_ptr<ExprASTNode> expression = parseExpression();
+    return std::make_unique<AssignmentASTNode>(std::move(variable),std::move(expression));
 }
 
 std::unique_ptr<ExprASTNode> Parser::parseIdentiferExpression()
 {
     std::string identifier = m_Lexer.identifierStr();
     getNextToken(); // eat identifier
+
+    if(CurTok == tok_assign)
+        return parseAssignemntExpression(identifier);
+
     if (CurTok != '(')
     {
         return std::make_unique<VariableASTNode>(identifier); // just a variable
@@ -176,12 +195,18 @@ std::unique_ptr<MainFunctionBlockStatementASTNode> Parser::parseMainFunctionBloc
     std::vector<std::unique_ptr<ExprASTNode>> expressions;
     while (CurTok != tok_end)
     {
+        std::unique_ptr<ExprASTNode> expression = nullptr;
         switch (CurTok)
         {
         case tok_identifier:
-            std::unique_ptr<ExprASTNode> expression = parseIdentiferExpression();
+            expression = parseIdentiferExpression();
             expressions.push_back(std::move(expression));
             getNextToken(); // eat ;
+            break;
+        case tok_readln:
+            expression = parseReadLnExpression();
+            expressions.push_back(std::move(expression));
+            getNextToken();
             break;
         }
     }
@@ -205,7 +230,6 @@ std::unique_ptr<NumberASTNode> Parser::parseNumber()
     getNextToken(); // eat the number
     return std::make_unique<NumberASTNode>(value);
 }
-
 
 std::unique_ptr<VariableDeclarationASTNode> Parser::parseVariableDeclaration()
 {
@@ -234,6 +258,28 @@ std::unique_ptr<ConstantDeclarationASTNode> Parser::parseConstantDeclaration()
     return std::make_unique<ConstantDeclarationASTNode>(variable, value);
 }
 
+void Parser::parseMainFunction(std::vector<std::unique_ptr<StatementASTNode>>& statements)
+{
+    switch (CurTok)
+    {
+    case tok_const:
+        getNextToken(); // eat const token
+        parseConstantDeclarationBlock(statements);
+        break;
+    case tok_var:
+        getNextToken(); // eat var 
+        parseVariableDeclarationBLock(statements);
+        break;
+    case tok_begin:
+        getNextToken(); // eat begin
+        std::unique_ptr<MainFunctionBlockStatementASTNode> mainBlock = parseMainFunctionBlock();
+        statements.push_back(std::move(mainBlock));
+        getNextToken(); // eat end
+        getNextToken(); // eat .
+        break;
+    }
+}
+
 std::unique_ptr<ProgramASTNode> Parser::parseProgram()
 {
     if (getNextToken() != tok_program)
@@ -249,24 +295,25 @@ std::unique_ptr<ProgramASTNode> Parser::parseProgram()
     {
         if (CurTok == tok_eof)
             break;
-        std::cout << tokenMap[CurTok] << std::endl;
         switch (CurTok)
         {
-        case tok_const:
-            getNextToken(); // eat const token
-            parseConstantDeclarationBlock(statements);
-            break;
-        case tok_var:
-            getNextToken(); // eat var 
-            parseGlobalVariableDeclarationBLock(statements);
-            break;
-        case tok_begin:
-            getNextToken(); // eat begin
-            std::unique_ptr<MainFunctionBlockStatementASTNode> mainBlock = parseMainFunctionBlock();
-            statements.push_back(std::move(mainBlock));
-            getNextToken(); // eat end
-            getNextToken(); // eat .
-            break;
+        default:
+            parseMainFunction(statements);
+        // case tok_const:
+        //     getNextToken(); // eat const token
+        //     parseConstantDeclarationBlock(statements);
+        //     break;
+        // case tok_var:
+        //     getNextToken(); // eat var 
+        //     parseVariableDeclarationBLock(statements);
+        //     break;
+        // case tok_begin:
+        //     getNextToken(); // eat begin
+        //     std::unique_ptr<MainFunctionBlockStatementASTNode> mainBlock = parseMainFunctionBlock();
+        //     statements.push_back(std::move(mainBlock));
+        //     getNextToken(); // eat end
+        //     getNextToken(); // eat .
+        //     break;
         }
     }
 
@@ -287,17 +334,25 @@ const llvm::Module &Parser::Generate()
             Arg.setName("x");
     }
 
-    
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(gen.MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(gen.MilaContext));
         llvm::FunctionType *readlnFT = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), Ints, false);
         llvm::Function *readlnF = llvm::Function::Create(readlnFT, llvm::Function::ExternalLinkage, "readln", gen.MilaModule);
         for (auto &Arg : readlnF->args())
             Arg.setName("x");
     }
+            // create main function
+    llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), false);
+    llvm::Function *MainFunction = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "main", gen.MilaModule);
 
+    // block
+    llvm::BasicBlock *BB = llvm::BasicBlock::Create(gen.MilaContext, "entry", MainFunction);
+    gen.MilaBuilder.SetInsertPoint(BB);
 
     astRoot->codegen(gen);
+
+            // return 0
+    gen.MilaBuilder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(gen.MilaContext), 0));
 
     return this->gen.MilaModule;
 }
@@ -312,6 +367,6 @@ const llvm::Module &Parser::Generate()
 int Parser::getNextToken()
 {
     CurTok = m_Lexer.gettok();
-    std::cout << tokenMap[CurTok] << " " << std::endl;
+    // std::cout << CurTok << " - " << tokenMap[CurTok] << " " << std::endl;
     return CurTok;
 }

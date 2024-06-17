@@ -111,7 +111,7 @@ LessThan:
     }
     return '<';
 Word:
-    if(isalpha(std::cin.peek()))
+    if(isalnum(std::cin.peek()))
     {
         word += std::cin.get();
         goto Word;
@@ -165,6 +165,8 @@ Word:
         return tok_for;
     else if ( word == "do" )
         return tok_do;
+    else if ( word == "readln")
+        return tok_readln;
     else
     {
         m_IdentifierStr = word;

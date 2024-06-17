@@ -10,7 +10,9 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -fsanitize=address -g -pedantic ${CMAKE_CXX_F
 
 # Change this to force specific version of LLVM
 # find_package(LLVM "${MAJOR}.${MINOR}" REQUIRED CONFIG)
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM "12.0.1" REQUIRED CONFIG)
+
+# find_package(LLVM REQUIRED CONFIG)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")

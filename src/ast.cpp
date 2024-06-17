@@ -43,6 +43,14 @@ void NumberASTNode::print(int level) const
     std::cout << "Number: " << m_value << "\n";
 }
 
+void AssignmentASTNode::print(int level) const
+{
+    printIndent(level);
+    std::cout << "Assignment AST Node " << std::endl;
+    m_variable->print(level+1);
+    m_expr->print(level+1);
+}
+
 void ProgramASTNode::print(int level) const
 {
     printIndent(level);
@@ -79,19 +87,25 @@ void FunctinoCallExprASTNode::print(int level) const
     std::cout << "Function Call Expression Node\n";
 }
 
+void ReadlnExprASTNode::print(int level) const
+{
+    printIndent(level);
+    std::cout << "ReadLine Expression Node\n";
+}
+
 void BinaryOperationASTNode::print(int level) const
 {
     printIndent(level);
     std::cout << "Binary Operation Expression Node " << m_operator << std::endl;
-    m_LHS->print();
-    m_RHS->print();
+    m_LHS->print(level+1);
+    m_RHS->print(level+1);
 }
 
 void VariableDeclarationASTNode::print(int level) const
 {
     printIndent(level);
     std::cout << "Variable Declaration Node " << std::endl;
-    m_value->print(level+1);
+    if(m_value) m_value->print(level+1);
 }
 
 
@@ -104,13 +118,15 @@ llvm::Value *BinaryOperationASTNode::codegen(GenContext &gen) const
     switch (m_operator)
     {
     case '+':
-        return gen.MilaBuilder.CreateFAdd(LHS, RHS, "Add");
+        return gen.MilaBuilder.CreateAdd(LHS, RHS, "Add");
     case '-':
-        return gen.MilaBuilder.CreateFSub(LHS, RHS, "Subtract");
+        return gen.MilaBuilder.CreateSub(LHS, RHS, "Subtract");
     case '*':
-        return gen.MilaBuilder.CreateFMul(LHS, RHS, "Multiply");
+        return gen.MilaBuilder.CreateMul(LHS, RHS, "Multiply");
     case tok_div:
-        return gen.MilaBuilder.CreateFDiv(LHS, RHS, "Div");
+        return gen.MilaBuilder.CreateSDiv(LHS, RHS, "Div");
+    case tok_mod:
+        return gen.MilaBuilder.CreateSRem(LHS,RHS,"Mod");
     default:
         throw std::logic_error("no operator");
     }
@@ -128,6 +144,41 @@ llvm::Value *ProgramASTNode::codegen(GenContext &gen) const
 llvm::Value *NumberASTNode::codegen(GenContext &gen) const
 {
     return llvm::ConstantInt::get(llvm::Type::getInt32Ty(gen.MilaContext), m_value);
+}
+
+llvm::Value * AssignmentASTNode::codegen(GenContext & gen) const
+{
+    auto store = m_variable->getStore(gen);
+    auto e = m_expr->codegen(gen);
+    return gen.MilaBuilder.CreateStore(e,store);
+}
+
+
+llvm::Value * VariableDeclarationASTNode::codegen(GenContext & gen ) const
+{
+    if(gen.symbolTable.count(m_variable) > 0)
+        throw std::logic_error("Variable already declared");
+
+
+    llvm::AllocaInst * store = gen.MilaBuilder.CreateAlloca(llvm::Type::getInt32Ty(gen.MilaContext),nullptr,m_variable);
+    gen.symbolTable[m_variable] = store;
+    if(m_value)
+    {
+        auto e = m_value->codegen(gen);
+        gen.MilaBuilder.CreateStore(e,store);
+    }
+    return nullptr;
+}
+
+
+llvm::Value * VariableASTNode::codePtrGen(GenContext & gen) const
+{
+    if(auto it = gen.symbolTable.find(m_identifier); it!=gen.symbolTable.end()){
+        llvm::AllocaInst * ptrStore = gen.MilaBuilder.CreateAlloca(llvm::Type::getInt32PtrTy(gen.MilaContext),nullptr,"ptr");
+        gen.MilaBuilder.CreateStore(it->second,ptrStore);
+        return gen.MilaBuilder.CreateLoad(llvm::Type::getInt32PtrTy(gen.MilaContext),ptrStore);
+    }
+    return nullptr;
 }
 
 llvm::Value *VariableASTNode::codegen(GenContext &gen) const
@@ -157,20 +208,7 @@ llvm::AllocaInst * VariableASTNode::getStore(GenContext & gen) const
 
 }
 
-llvm::Value * VariableDeclarationASTNode::codegen(GenContext & gen ) const
-{
-    if(gen.symbolTable.count(m_variable) > 0)
-        throw std::logic_error("Variable already declared");
 
-    llvm::AllocaInst * store = gen.MilaBuilder.CreateAlloca(llvm::Type::getInt32Ty(gen.MilaContext),nullptr,m_variable);
-    gen.symbolTable[m_variable] = store;
-    if(m_value)
-    {
-        auto e = m_value->codegen(gen);
-        gen.MilaBuilder.CreateStore(e,store);
-    }
-    return nullptr;
-}
 
 llvm::Value *ConstantDeclarationASTNode::codegen(GenContext &gen) const
 {
@@ -189,23 +227,26 @@ llvm::Value *BlockStatmentASTNode::codegen(GenContext &gen) const
 
 llvm::Value *MainFunctionBlockStatementASTNode::codegen(GenContext &gen) const
 {
-    // create main function
-    llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), false);
-    llvm::Function *MainFunction = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "main", gen.MilaModule);
-
-    // block
-    llvm::BasicBlock *BB = llvm::BasicBlock::Create(gen.MilaContext, "entry", MainFunction);
-    gen.MilaBuilder.SetInsertPoint(BB);
 
     for (auto &expression : m_expresions)
     {
         expression->codegen(gen);
     }
 
-    // return 0
-    gen.MilaBuilder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(gen.MilaContext), 0));
+
 
     return nullptr;
+}
+
+
+
+
+llvm::Value * ReadlnExprASTNode::codegen(GenContext & gen) const
+{
+    llvm::Function *calleeF = gen.MilaModule.getFunction("readln");
+    std::vector<llvm::Value *> argsV;
+    argsV.push_back(m_variable->codePtrGen(gen));
+    return gen.MilaBuilder.CreateCall(calleeF,argsV,"readln");
 }
 
 llvm::Value *FunctinoCallExprASTNode::codegen(GenContext &gen) const

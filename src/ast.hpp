@@ -18,7 +18,7 @@
 
 #include <vector>
 using SymbolTable = std::map<std::string, llvm::AllocaInst *>;
-using ConstantValueTable = std::map<std::string , int >;
+using ConstantValueTable = std::map<std::string, int>;
 
 class GenContext
 {
@@ -58,8 +58,21 @@ class VariableASTNode : public ExprASTNode
 public:
   VariableASTNode(const std::string &name) : m_identifier(name) {}
   llvm::Value *codegen(GenContext &gen) const override;
+  llvm::Value *codePtrGen(GenContext &gen) const;
   virtual void print(int level = 0) const override;
-  llvm::AllocaInst * getStore(GenContext & gen) const;
+  llvm::AllocaInst *getStore(GenContext &gen) const;
+};
+
+class AssignmentASTNode : public ExprASTNode
+{
+  std::unique_ptr<VariableASTNode> m_variable;
+  std::unique_ptr<ExprASTNode> m_expr;
+
+public:
+  AssignmentASTNode(std::unique_ptr<VariableASTNode> variable , std::unique_ptr<ExprASTNode> expression)
+    :m_variable(std::move(variable)),m_expr(std::move(expression)) {}
+  llvm::Value * codegen(GenContext & gen) const override;
+  virtual void print(int level = 0) const override;
 };
 
 class NumberASTNode : public ExprASTNode
@@ -81,6 +94,16 @@ class BinaryOperationASTNode : public ExprASTNode
 public:
   BinaryOperationASTNode(int operatorType, std::unique_ptr<ExprASTNode> LHS, std::unique_ptr<ExprASTNode> RHS)
       : m_operator(operatorType), m_LHS(std::move(LHS)), m_RHS(std::move(RHS)) {}
+  llvm::Value *codegen(GenContext &gen) const override;
+  virtual void print(int level = 0) const override;
+};
+
+class ReadlnExprASTNode : public ExprASTNode
+{
+  std::unique_ptr<VariableASTNode> m_variable;
+
+public:
+  ReadlnExprASTNode(std::unique_ptr<VariableASTNode> variable) : m_variable(std::move(variable)) {}
   llvm::Value *codegen(GenContext &gen) const override;
   virtual void print(int level = 0) const override;
 };
@@ -121,14 +144,11 @@ class VariableDeclarationASTNode : public StatementASTNode
   std::string m_variable;
   std::unique_ptr<ExprASTNode> m_value;
 
-  public:
-  VariableDeclarationASTNode(std::string variable , std::unique_ptr<ExprASTNode> value):
-                      m_variable(variable),m_value(std::move(value)) {}
-  virtual void print(int level = 0 ) const override;
-  virtual llvm::Value * codegen(GenContext & ) const override;
-        
+public:
+  VariableDeclarationASTNode(std::string variable, std::unique_ptr<ExprASTNode> value) : m_variable(variable), m_value(std::move(value)) {}
+  virtual void print(int level = 0) const override;
+  virtual llvm::Value *codegen(GenContext &) const override;
 };
-
 
 class BlockStatmentASTNode : public StatementASTNode
 {

@@ -53,7 +53,8 @@ enum Token
     tok_downto = -31,
 
     // keywords for array
-    tok_array = -32
+    tok_array = -32,
+    tok_readln = -33
 };
 
 

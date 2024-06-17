@@ -20,6 +20,7 @@
 #include <iostream>
 
 static std::map<int, std::string> tokenMap = {
+            { '*' , "*" } ,
             { ')' , ")"},
             { '(' , "("},
             { ';' , "semi_colon"},
@@ -43,6 +44,7 @@ static std::map<int, std::string> tokenMap = {
             {-17, "tok_integer"},
             {-18, "tok_for"},
             {-19, "tok_do"},
+            {-23 , "tok_assign"},
             {-25, "tok_mod"},
             {-26, "tok_div"},
             {-27, "tok_not"},
@@ -51,7 +53,7 @@ static std::map<int, std::string> tokenMap = {
             {-30, "tok_to"},
             {-31, "tok_downto"},
             {-32, "tok_array"},
-            {-33, "tok_range"}
+            {-33, "tok_readln"}
 };
 
 static std::map<int, int> BinopPrecedence = 
@@ -59,7 +61,8 @@ static std::map<int, int> BinopPrecedence =
     {'+',10},
     {'-',10},
     { '*',20},
-    { tok_div,20}
+    { tok_div,20},
+    { tok_mod , 20},
 };
 
 class Parser {
@@ -75,7 +78,8 @@ private:
     void handleConstantDeclaration();
     
     void parseConstantDeclarationBlock(std::vector<std::unique_ptr<StatementASTNode>>&);
-    void parseGlobalVariableDeclarationBLock(std::vector<std::unique_ptr<StatementASTNode>>&);
+    void parseVariableDeclarationBLock(std::vector<std::unique_ptr<StatementASTNode>>&);
+    void parseMainFunction(std::vector<std::unique_ptr<StatementASTNode>>&);
 
     std::unique_ptr<ConstantDeclarationASTNode> parseConstantDeclaration();
     std::unique_ptr<VariableDeclarationASTNode> parseVariableDeclaration();
@@ -84,7 +88,8 @@ private:
     std::unique_ptr<ProgramASTNode> parseProgram();
     std::unique_ptr<BlockStatmentASTNode> parseBlockStatement();
     std::unique_ptr<MainFunctionBlockStatementASTNode> parseMainFunctionBlock();
-
+    std::unique_ptr<ExprASTNode> parseReadLnExpression();
+std::unique_ptr<ExprASTNode> parseAssignemntExpression(const std::string identifier);
     std::unique_ptr<ExprASTNode> parseIdentiferExpression();
     std::unique_ptr<ExprASTNode> parseExpression();
     std::unique_ptr<ExprASTNode> parsePrimary();
