@@ -13,6 +13,38 @@ void ASTNode::printIndent(int level) const
     }
 }
 
+void UnaryOperationASTNode::print(int level) const
+{
+    printIndent(level);
+}
+
+void IfElseASTNode::print(int level) const
+{
+    printIndent(level);
+    std::cout << "If else ast node " << std::endl;
+    m_condition->print(level+1);
+    m_then->print(level+1);
+    m_else->print(level+1);
+}
+
+void PrototypeASTNode::print(int level) const
+{
+    printIndent(level);
+    std::cout << "Function prototype node" << std::endl;
+}
+
+void FunctionASTNode::print(int level) const
+{
+    printIndent(level);
+    std::cout << "Function Node" << std::endl;
+    m_prototype->print(level + 1);
+    for (auto &variable : m_variables)
+        variable->print(level + 1);
+    for (auto &constant : m_constants)
+        constant->print(level + 1);
+    m_body->print(level + 1);
+}
+
 void ExprASTNode::print(int level) const
 {
     printIndent(level);
@@ -47,17 +79,17 @@ void AssignmentASTNode::print(int level) const
 {
     printIndent(level);
     std::cout << "Assignment AST Node " << std::endl;
-    m_variable->print(level+1);
-    m_expr->print(level+1);
+    m_variable->print(level + 1);
+    m_expr->print(level + 1);
 }
 
 void ProgramASTNode::print(int level) const
 {
     printIndent(level);
     std::cout << "Program Node\n";
-    for (const auto &stmt : m_statements)
+    for (const auto &function : m_functions)
     {
-        stmt->print(level + 1);
+        function->print(level + 1);
     }
 }
 
@@ -97,17 +129,17 @@ void BinaryOperationASTNode::print(int level) const
 {
     printIndent(level);
     std::cout << "Binary Operation Expression Node " << m_operator << std::endl;
-    m_LHS->print(level+1);
-    m_RHS->print(level+1);
+    m_LHS->print(level + 1);
+    m_RHS->print(level + 1);
 }
 
 void VariableDeclarationASTNode::print(int level) const
 {
     printIndent(level);
     std::cout << "Variable Declaration Node " << std::endl;
-    if(m_value) m_value->print(level+1);
+    if (m_value)
+        m_value->print(level + 1);
 }
-
 
 llvm::Value *BinaryOperationASTNode::codegen(GenContext &gen) const
 {
@@ -126,7 +158,15 @@ llvm::Value *BinaryOperationASTNode::codegen(GenContext &gen) const
     case tok_div:
         return gen.MilaBuilder.CreateSDiv(LHS, RHS, "Div");
     case tok_mod:
-        return gen.MilaBuilder.CreateSRem(LHS,RHS,"Mod");
+        return gen.MilaBuilder.CreateSRem(LHS, RHS, "Mod");
+    case '<':
+        return gen.MilaBuilder.CreateICmpSLT(LHS,RHS,"LessThan");
+    case '>':
+        return gen.MilaBuilder.CreateICmpSGT(LHS,RHS,"GreaterThan");
+    case tok_lessequal:
+        return gen.MilaBuilder.CreateICmpSLE(LHS,RHS,"lessthanEqual");
+    case tok_greaterequal:
+        return gen.MilaBuilder.CreateICmpSGE(LHS,RHS,"GreterthanEqual");
     default:
         throw std::logic_error("no operator");
     }
@@ -134,9 +174,9 @@ llvm::Value *BinaryOperationASTNode::codegen(GenContext &gen) const
 
 llvm::Value *ProgramASTNode::codegen(GenContext &gen) const
 {
-    for (auto &statement : m_statements)
+    for (auto &function : m_functions)
     {
-        statement->codegen(gen);
+        function->codegen(gen);
     }
     return nullptr;
 }
@@ -146,34 +186,32 @@ llvm::Value *NumberASTNode::codegen(GenContext &gen) const
     return llvm::ConstantInt::get(llvm::Type::getInt32Ty(gen.MilaContext), m_value);
 }
 
-llvm::Value * AssignmentASTNode::codegen(GenContext & gen) const
+llvm::Value *AssignmentASTNode::codegen(GenContext &gen) const
 {
     auto store = m_variable->getStore(gen);
     auto e = m_expr->codegen(gen);
-    return gen.MilaBuilder.CreateStore(e,store);
+    return gen.MilaBuilder.CreateStore(e, store);
 }
 
-
-llvm::Value * VariableDeclarationASTNode::codegen(GenContext & gen ) const
+llvm::Value *VariableDeclarationASTNode::codegen(GenContext &gen) const
 {
-    if(gen.symbolTable.count(m_variable) > 0)
+    if (gen.symbolTable.count(m_variable) > 0)
         throw std::logic_error("Variable already declared");
 
-
-    llvm::AllocaInst * store = gen.MilaBuilder.CreateAlloca(llvm::Type::getInt32Ty(gen.MilaContext),nullptr,m_variable);
+    llvm::AllocaInst *store = gen.MilaBuilder.CreateAlloca(llvm::Type::getInt32Ty(gen.MilaContext), nullptr, m_variable);
     gen.symbolTable[m_variable] = store;
-    if(m_value)
+    if (m_value)
     {
         auto e = m_value->codegen(gen);
-        gen.MilaBuilder.CreateStore(e,store);
+        gen.MilaBuilder.CreateStore(e, store);
     }
     return nullptr;
 }
 
-
-llvm::Value * VariableASTNode::codePtrGen(GenContext & gen) const
+llvm::Value *VariableASTNode::codePtrGen(GenContext &gen) const
 {
-    if(auto it = gen.symbolTable.find(m_identifier); it!=gen.symbolTable.end()){
+    if (auto it = gen.symbolTable.find(m_identifier); it != gen.symbolTable.end())
+    {
         return it->second;
     }
     return nullptr;
@@ -181,32 +219,141 @@ llvm::Value * VariableASTNode::codePtrGen(GenContext & gen) const
 
 llvm::Value *VariableASTNode::codegen(GenContext &gen) const
 {
-    llvm::AllocaInst * store = gen.symbolTable[m_identifier];
-    if (!store && gen.constantTable.count(m_identifier) <= 0)
+    if (gen.symbolTable.count(m_identifier) <= 0 && gen.constantTable.count(m_identifier) <= 0)
         throw std::logic_error("variable not defined");
     if (gen.constantTable.count(m_identifier) > 0)
     {
-        llvm::ConstantInt* constInt = llvm::ConstantInt::get(gen.MilaContext, llvm::APInt(32,gen.constantTable[m_identifier] , true));
-        return constInt;
+        return gen.constantTable[m_identifier];
+    }
+    if(llvm::isa<llvm::Argument>(gen.symbolTable[m_identifier]))
+    {
+        return gen.symbolTable[m_identifier];
     }
 
-    if(auto it = gen.symbolTable.find(m_identifier); it!=gen.symbolTable.end()){
-        return gen.MilaBuilder.CreateLoad(llvm::Type::getInt32Ty(gen.MilaContext),it->second);
+    llvm::AllocaInst *store = static_cast<llvm::AllocaInst *>(gen.symbolTable[m_identifier]);
+
+
+    if (auto it = gen.symbolTable.find(m_identifier); it != gen.symbolTable.end())
+    {
+        return gen.MilaBuilder.CreateLoad(llvm::Type::getInt32Ty(gen.MilaContext), it->second);
     }
     return nullptr;
 }
 
-llvm::AllocaInst * VariableASTNode::getStore(GenContext & gen) const
+llvm::AllocaInst *VariableASTNode::getStore(GenContext &gen) const
 {
-    if (auto it = gen.symbolTable.find(m_identifier); it != gen.symbolTable.end()) {
-        return it->second;
-    } else {
+    if (auto it = gen.symbolTable.find(m_identifier); it != gen.symbolTable.end())
+    {
+        return static_cast<llvm::AllocaInst *>(it->second);
+    }
+    else
+    {
         throw std::logic_error("var not declared");
     }
-
 }
 
+llvm::Function *PrototypeASTNode::codegen(GenContext &gen) const
+{
+    if (m_name == "main")
+    {
+        llvm::FunctionType *functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), false);
+        llvm::Function *mainFunction = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, "main", gen.MilaModule);
+        // block
+        return mainFunction;
+    }
 
+    std::vector<llvm::Type *> Arguments(m_args.size(), llvm::Type::getInt32Ty(gen.MilaContext));
+    llvm::FunctionType *FT = nullptr;
+    if (m_type == PrototypeASTNode::PROCEDURE)
+    {
+        FT = llvm::FunctionType::get(llvm::Type::getVoidTy(gen.MilaContext), Arguments, false);
+    }
+    else
+    {
+        FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(gen.MilaContext), Arguments, false);
+    }
+
+    llvm::Function *F =
+        llvm::Function::Create(FT, llvm::Function::ExternalLinkage, m_name, gen.MilaModule);
+
+    unsigned index = 0;
+    for (auto &Arg : F->args())
+        Arg.setName(m_args[index++]);
+    return F;
+}
+
+llvm::Function *FunctionASTNode::codegen(GenContext &gen) const
+{
+
+    // llvm::Function * function = gen.MilaModule.getFunction(m_prototype->getName());
+    // if(!function)
+    // {
+    //     function = m_prototype->codegen(gen);
+    // }
+
+    llvm::Function *function = m_prototype->codegen(gen);
+
+    if (!function)
+        return nullptr;
+
+    if (m_prototype->getName() == "main")
+    {
+        llvm::BasicBlock *BB = llvm::BasicBlock::Create(gen.MilaContext, "entry", function);
+        gen.MilaBuilder.SetInsertPoint(BB);
+        gen.symbolTable.clear();
+        gen.constantTable.clear();
+        for (auto &variable : m_variables)
+        {
+            variable->codegen(gen);
+        }
+        for (auto &constant : m_constants)
+        {
+            constant->codegen(gen);
+        }
+        m_body->codegen(gen);
+        // return 0
+        gen.MilaBuilder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(gen.MilaContext), 0));
+        return function;
+    }
+
+    llvm::BasicBlock *BB = llvm::BasicBlock::Create(gen.MilaContext, "entry", function);
+    gen.MilaBuilder.SetInsertPoint(BB);
+    gen.symbolTable.clear();
+    gen.constantTable.clear();
+    for (auto &Arg : function->args())
+    {
+        gen.symbolTable[std::string(Arg.getName())] = &Arg;
+    }
+    m_prototype->getReturnValue()->codegen(gen);
+    for (auto &variable : m_variables)
+        variable->codegen(gen);
+    for (auto &constant : m_constants)
+        constant->codegen(gen);
+    m_body->codegen(gen);
+
+    if (m_prototype->m_type == PrototypeASTNode::PROCEDURE)
+    {
+        gen.MilaBuilder.CreateRetVoid();
+        llvm::verifyFunction(*function);
+        return function;
+    }
+
+    // if(llvm::Value * RetVal = m_body->codegen(gen))
+    // {
+    //     gen.MilaBuilder.CreateRet(RetVal);
+    //     llvm::verifyFunction(*function);
+    //     return function;
+    // }
+    auto it = gen.symbolTable.find(m_prototype->getName());
+    llvm::Value *retValue = gen.MilaBuilder.CreateLoad(llvm::Type::getInt32Ty(gen.MilaContext), it->second);
+
+    gen.MilaBuilder.CreateRet(retValue);
+    llvm::verifyFunction(*function);
+    return function;
+
+    // function->eraseFromParent();
+    // return nullptr;
+}
 
 llvm::Value *ConstantDeclarationASTNode::codegen(GenContext &gen) const
 {
@@ -214,12 +361,17 @@ llvm::Value *ConstantDeclarationASTNode::codegen(GenContext &gen) const
         throw std::logic_error("Variable already declared");
 
     llvm::Constant *constantValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(gen.MilaContext), m_value);
-    gen.constantTable[m_variable] = m_value;
+    gen.constantTable[m_variable] = constantValue;
     return nullptr;
 }
 
 llvm::Value *BlockStatmentASTNode::codegen(GenContext &gen) const
 {
+    for (auto &expression : m_expresions)
+    {
+        expression->codegen(gen);
+    }
+
     return nullptr;
 }
 
@@ -231,20 +383,15 @@ llvm::Value *MainFunctionBlockStatementASTNode::codegen(GenContext &gen) const
         expression->codegen(gen);
     }
 
-
-
     return nullptr;
 }
 
-
-
-
-llvm::Value * ReadlnExprASTNode::codegen(GenContext & gen) const
+llvm::Value *ReadlnExprASTNode::codegen(GenContext &gen) const
 {
     llvm::Function *calleeF = gen.MilaModule.getFunction("readln");
     std::vector<llvm::Value *> argsV;
     argsV.push_back(m_variable->codePtrGen(gen));
-    return gen.MilaBuilder.CreateCall(calleeF,argsV,"readln");
+    return gen.MilaBuilder.CreateCall(calleeF, argsV, "readln");
 }
 
 llvm::Value *FunctinoCallExprASTNode::codegen(GenContext &gen) const
@@ -264,4 +411,36 @@ llvm::Value *FunctinoCallExprASTNode::codegen(GenContext &gen) const
             return nullptr;
     }
     return gen.MilaBuilder.CreateCall(calleeF, argsV, m_callee);
+}
+
+
+llvm::Value * IfElseASTNode::codegen(GenContext & gen) const
+{
+    llvm::Value * condition = m_condition->codegen(gen);
+    if(!condition) return nullptr;
+    // condition = gen.MilaBuilder.CreateZExt(condition,llvm::Type::getInt32Ty(gen.MilaContext));
+    condition = gen.MilaBuilder.CreateICmpNE(condition,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(1,0)),"ifcond");
+    llvm::Function *TheFunction = gen.MilaBuilder.GetInsertBlock()->getParent();
+
+
+    llvm::BasicBlock *ThenBB =
+        llvm::BasicBlock::Create(gen.MilaContext, "then", TheFunction);
+    llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(gen.MilaContext, "else" , TheFunction);
+    llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(gen.MilaContext, "ifcont" , TheFunction);
+    gen.MilaBuilder.CreateCondBr(condition, ThenBB, ElseBB);
+    gen.MilaBuilder.SetInsertPoint(ThenBB);
+
+    llvm::Value *ThenV = m_then->codegen(gen);
+  if (!ThenV)
+    return nullptr;
+
+  gen.MilaBuilder.CreateBr(MergeBB);
+//   // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+//   ThenBB = gen.MilaBuilder.GetInsertBlock();
+    gen.MilaBuilder.SetInsertPoint(ElseBB);
+    llvm::Value * elseV = m_else->codegen(gen);
+    gen.MilaBuilder.CreateBr(MergeBB);
+    gen.MilaBuilder.SetInsertPoint(MergeBB);
+    return nullptr;
+
 }

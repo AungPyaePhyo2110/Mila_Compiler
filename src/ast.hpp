@@ -17,8 +17,8 @@
 #include <map>
 
 #include <vector>
-using SymbolTable = std::map<std::string, llvm::AllocaInst *>;
-using ConstantValueTable = std::map<std::string, int>;
+using SymbolTable = std::map<std::string, llvm::Value *>;
+using ConstantValueTable = std::map<std::string, llvm::Constant *>;
 
 class GenContext
 {
@@ -36,8 +36,8 @@ class ASTNode
 {
 public:
   virtual ~ASTNode() = default;
-  virtual llvm::Value *codegen(GenContext &gen) const = 0;
   virtual void print(int level = 0) const = 0;
+  virtual llvm::Value *codegen(GenContext &gen) const = 0;
 
 protected:
   void printIndent(int level) const;
@@ -85,6 +85,18 @@ public:
   virtual void print(int level = 0) const override;
 };
 
+class UnaryOperationASTNode : public ExprASTNode
+{
+  int m_operator;
+  std::unique_ptr<ExprASTNode> m_expr;
+  public:
+    UnaryOperationASTNode(int op , std::unique_ptr<ExprASTNode> expression):
+      m_operator(op),m_expr(std::move(expression)) {}
+    llvm::Value * codegen(GenContext & gen) const override;
+    virtual void print(int level =0) const override;
+}
+
+
 class BinaryOperationASTNode : public ExprASTNode
 {
   int m_operator;
@@ -119,38 +131,28 @@ public:
   virtual void print(int level = 0) const override;
 };
 
+
+
+class IfElseASTNode : public ExprASTNode
+{
+  std::unique_ptr<ExprASTNode> m_condition;
+  std::unique_ptr<ASTNode> m_then;
+  std::unique_ptr<ASTNode> m_else;
+  public:
+  IfElseASTNode(  std::unique_ptr<ExprASTNode> condition ,   std::unique_ptr<ASTNode> then ,   std::unique_ptr<ASTNode> elsebranch )
+    : m_condition(std::move(condition)) , m_then(std::move(then)) , m_else(std::move(elsebranch)) {}
+  virtual void print(int level = 0) const override;
+  virtual llvm::Value * codegen(GenContext & gen) const override;
+    
+};
+
+
 // statements
 class StatementASTNode : public ASTNode
 {
 public:
   virtual ~StatementASTNode(){};
   virtual void print(int level = 0) const override;
-};
-
-class PrototypeASTNode
-{
-  std::string m_name;
-  std::vector<std::string> m_args;
-  public:
-  PrototypeASTNode(std::string name = "main" , std::vector<std::string> args) : m_name(name) , m_args(std::move(args)) {}
-  void print(int level = 0) const;
-  const std::string & getName() { return m_name ;}
-  llvm::Function * codegen(GenContext & gen) const;
-};
-
-
-class FunctionASTNode
-{
-  std::unique_ptr<PrototypeASTNode> m_prototype;
-  std::unique_ptr<VariableDeclarationASTNode> m_variables;
-  std::unique_ptr<ConstantDeclarationASTNode> m_constants;
-  std::unique_ptr<BlockStatmentASTNode> m_body;
-  public:
-    FunctionASTNode(std::unique_ptr<PrototypeASTNode> prototype ,std::unique_ptr<VariableDeclarationASTNode> variables,
-                    std::unique_ptr<ConstantDeclarationASTNode> constants , std::unique_ptr<BlockStatmentASTNode> body):
-                    m_prototype(std::move(prototype)),m_variables(std::move(variables)),m_constants(std::move(constants)),
-                    m_body(std::move(body)) {}
-    llvm::Function codegen(GenContext & gen) const;
 };
 
 class ConstantDeclarationASTNode : public StatementASTNode
@@ -198,13 +200,47 @@ public:
 
 //
 
+class PrototypeASTNode : public ASTNode
+{
+
+  public:
+  enum Type{ FUNCTION , PROCEDURE };
+
+  PrototypeASTNode(std::string name , std::vector<std::string> args , Type type , std::unique_ptr<VariableDeclarationASTNode> returnValue) 
+      :  m_type(type) , m_name(name) , m_args(std::move(args)) , m_returnValue(std::move(returnValue))  {}
+  void print(int level = 0) const;
+  const std::string & getName() { return m_name ;}
+  llvm::Function * codegen(GenContext & gen) const;
+  std::unique_ptr<VariableDeclarationASTNode> getReturnValue () { return std::move(m_returnValue) ;}
+  Type m_type;
+  private:
+    std::string m_name;
+    std::vector<std::string> m_args;
+    std::unique_ptr<VariableDeclarationASTNode> m_returnValue;
+};
+
+class FunctionASTNode : public ASTNode
+{
+  std::unique_ptr<PrototypeASTNode> m_prototype;
+  std::vector<std::unique_ptr<VariableDeclarationASTNode>> m_variables;
+  std::vector<std::unique_ptr<ConstantDeclarationASTNode>> m_constants;
+  std::unique_ptr<BlockStatmentASTNode> m_body;
+  public:
+    FunctionASTNode(std::unique_ptr<PrototypeASTNode> prototype ,std::vector<std::unique_ptr<VariableDeclarationASTNode>> variables,
+                    std::vector<std::unique_ptr<ConstantDeclarationASTNode>> constants , std::unique_ptr<BlockStatmentASTNode> body):
+                    m_prototype(std::move(prototype)),m_variables(std::move(variables)),m_constants(std::move(constants)),
+                    m_body(std::move(body)) {}
+    llvm::Function * codegen(GenContext & gen) const;
+    void print(int level = 0) const override;
+};
+
 class ProgramASTNode : public ASTNode
 {
-  std::vector<std::unique_ptr<StatementASTNode>> m_statements;
+  std::vector<std::unique_ptr<FunctionASTNode>> m_functions;
 
 public:
-  ProgramASTNode(std::vector<std::unique_ptr<StatementASTNode>> statments) : m_statements(std::move(statments)) {}
-  llvm::Value *codegen(GenContext &gen) const override;
+  ProgramASTNode(std::vector<std::unique_ptr<FunctionASTNode>> functions) : m_functions(std::move(functions)) {}
+  llvm::Value *codegen(GenContext &gen) const;
   virtual void print(int level = 0) const override;
 };
 

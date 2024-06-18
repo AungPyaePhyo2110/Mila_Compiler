@@ -58,11 +58,15 @@ static std::map<int, std::string> tokenMap = {
 
 static std::map<int, int> BinopPrecedence = 
 {
-    {'+',10},
-    {'-',10},
-    { '*',20},
-    { tok_div,20},
-    { tok_mod , 20},
+    { '<' , 10},
+    { '>' , 10},
+    {tok_greaterequal , 10},
+    {tok_lessequal , 10},
+    {'+',20},
+    {'-',20},
+    { '*',30},
+    { tok_div,30},
+    { tok_mod , 30},
 };
 
 class Parser {
@@ -76,10 +80,16 @@ public:
 private:
     int getNextToken();
     void handleConstantDeclaration();
-    
-    void parseConstantDeclarationBlock(std::vector<std::unique_ptr<StatementASTNode>>&);
-    void parseVariableDeclarationBLock(std::vector<std::unique_ptr<StatementASTNode>>&);
-    void parseMainFunction(std::vector<std::unique_ptr<StatementASTNode>>&);
+
+    std::string parseFunctionParameter();
+    void parseConstantDeclarationBlock(std::vector<std::unique_ptr<ConstantDeclarationASTNode>>&);
+    void parseVariableDeclarationBLock(std::vector<std::unique_ptr<VariableDeclarationASTNode>>&);
+    std::unique_ptr<FunctionASTNode> parseMainFunction();
+
+    std::unique_ptr<FunctionASTNode> parseFunction();
+    std::unique_ptr<PrototypeASTNode> parseProtoType();
+    std::unique_ptr<VariableDeclarationASTNode> parseReturnValue();
+    std::unique_ptr<ExprASTNode> parseIfElseExpression();
 
     std::unique_ptr<ConstantDeclarationASTNode> parseConstantDeclaration();
     std::unique_ptr<VariableDeclarationASTNode> parseVariableDeclaration();
