@@ -69,6 +69,14 @@ std::unique_ptr<ExprASTNode> Parser::parseParentheseExpression()
     return expression;
 }
 
+std::unique_ptr<UnaryOperationASTNode> Parser::parseUnaryExpression()
+{
+    int optoken = CurTok;
+    getNextToken(); // eat operator
+    std::unique_ptr<ExprASTNode> expression = parseExpression();
+    return std::make_unique<UnaryOperationASTNode>(optoken,std::move(expression));
+}
+
 std::unique_ptr<ExprASTNode> Parser::parsePrimary()
 {
     switch (CurTok)
@@ -81,10 +89,10 @@ std::unique_ptr<ExprASTNode> Parser::parsePrimary()
         return parseNumberExpression();
     case '(':
         return parseParentheseExpression();
-    // case '-':
-    //     return parseUnaryExpression();
-    // case '+':
-    //     return parseUnaryExpression();
+    case '-':
+        return parseUnaryExpression();
+    case '+':
+        return parseUnaryExpression();
     }
 }
 
@@ -194,33 +202,65 @@ std::unique_ptr<ExprASTNode> Parser::parseIfElseExpression()
 {
     getNextToken(); // eat if
     std::unique_ptr<ExprASTNode> condition = parseExpression();
+
     getNextToken(); // eat then
-    std::unique_ptr<ExprASTNode> then = parseIdentiferExpression();
+    std::unique_ptr<ASTNode> then = nullptr;
+    if(CurTok == tok_begin)
+    {
+        then = parseMainFunctionBlock();
+        getNextToken(); // eat ;
+    }
+    else
+        then = parseExpressionLines();
+    if(CurTok != tok_else ) return std::make_unique<IfElseASTNode> (std::move(condition),std::move(then),nullptr);
     getNextToken(); // eat else
-    std::unique_ptr<ExprASTNode> elseBranch = parseIdentiferExpression();
+    std::unique_ptr<ASTNode> elseBranch = nullptr;
+    if(CurTok == tok_begin)
+    {
+        elseBranch = parseMainFunctionBlock();
+        getNextToken(); // eat ;
+    }
+    else
+        elseBranch = parseExpressionLines();
     return std::make_unique<IfElseASTNode> (std::move(condition),std::move(then),std::move(elseBranch));
 }
 
-std::unique_ptr<BlockStatmentASTNode> Parser::parseMainFunctionBlock()
+std::unique_ptr<FunctionExitASTNode> Parser::parseFunctionExit()
 {
+    getNextToken(); //eat exit
+    if(CurTok == ';') getNextToken(); // eat ;
+    return std::make_unique<FunctionExitASTNode>();
+}
+
+std::unique_ptr<ExprASTNode> Parser::parseExpressionLines()
+{
+    switch (CurTok)
+    {
+    case tok_if:
+        return parseIfElseExpression();
+    case tok_identifier:
+        return parseIdentiferExpression();
+    case tok_exit:
+        return parseFunctionExit();
+    case tok_while:
+        return parseWhile();
+    default:
+        return nullptr;
+    }
+}
+
+std::unique_ptr<BlockStatmentASTNode> Parser::parseMainFunctionBlock()
+{   
+    getNextToken(); // eat begin
+
     std::vector<std::unique_ptr<ExprASTNode>> expressions;
     while (CurTok != tok_end)
     {
-        std::unique_ptr<ExprASTNode> expression = nullptr;
-        switch (CurTok)
-        {
-        case tok_if:
-            expression = parseIfElseExpression();
-            expressions.push_back(std::move(expression));
-            getNextToken(); // eat;
-            break;
-        case tok_identifier:
-            expression = parseIdentiferExpression();
-            expressions.push_back(std::move(expression));
-            getNextToken(); // eat ;
-            break;
-        }
+        std::unique_ptr<ExprASTNode> expression = parseExpressionLines();
+        expressions.push_back(std::move(expression));
+        if(CurTok == ';') getNextToken(); // eat ;
     }
+    getNextToken(); // eat end
     return std::make_unique<BlockStatmentASTNode>(std::move(expressions));
 }
 
@@ -319,8 +359,16 @@ std::unique_ptr<PrototypeASTNode> Parser::parseProtoType()
 std::unique_ptr<FunctionASTNode> Parser::parseFunction()
 {
     std::unique_ptr<PrototypeASTNode> prototype = parseProtoType();
-    std::vector<std::unique_ptr<VariableDeclarationASTNode>> variables;
+
+        std::vector<std::unique_ptr<VariableDeclarationASTNode>> variables;
     std::vector<std::unique_ptr<ConstantDeclarationASTNode>> constants;
+    if(CurTok == tok_forward)
+    {
+        getNextToken(); // eat forward
+        getNextToken(); // eat semicolon;
+        return std::make_unique<FunctionASTNode>(std::move(prototype),std::move(variables),std::move(constants),nullptr);
+    }
+
     while (CurTok == tok_var || CurTok == tok_const)
     {    
         if (CurTok == tok_const)
@@ -335,9 +383,7 @@ std::unique_ptr<FunctionASTNode> Parser::parseFunction()
         }
     }
 
-    getNextToken(); // eat begin
     std::unique_ptr<BlockStatmentASTNode> mainBlock = parseMainFunctionBlock();
-    getNextToken(); // eat end
     getNextToken(); // eat semicolon
     return std::make_unique<FunctionASTNode>(std::move(prototype), std::move(variables), std::move(constants), std::move(mainBlock));
 }
@@ -360,9 +406,7 @@ std::unique_ptr<FunctionASTNode> Parser::parseMainFunction()
             parseVariableDeclarationBLock(variables);
         }
     }
-    getNextToken(); // eat begin    
     std::unique_ptr<BlockStatmentASTNode> mainBlock = parseMainFunctionBlock();
-    getNextToken(); // eat end
     getNextToken(); // eat .
 
     return std::make_unique<FunctionASTNode>(std::move(prototype), std::move(variables), std::move(constants), std::move(mainBlock));
@@ -381,20 +425,18 @@ std::unique_ptr<ProgramASTNode> Parser::parseProgram()
     std::vector<std::unique_ptr<FunctionASTNode>> functions;
     while (true)
     {
+        int i = 0 ;
         if (CurTok == tok_eof)
             break;
-        std::unique_ptr<FunctionASTNode> function = nullptr;
         switch (CurTok)
         {
         case tok_function:
-            function = parseFunction();
-            functions.push_back(std::move(function));
+            functions.push_back(std::move(parseFunction()));
             break;
         case tok_procedure:
             break;
         default:
-            function = parseMainFunction();
-            functions.push_back(std::move(function));
+            functions.push_back(std::move(parseMainFunction()));
             break;
         }
     }
@@ -437,6 +479,21 @@ const llvm::Module &Parser::Generate()
 int Parser::getNextToken()
 {
     CurTok = m_Lexer.gettok();
-    // std::cout << CurTok << " - " << tokenMap[CurTok] << " " << std::endl;
+    std::cout << CurTok << " - " << tokenMap[CurTok] << " " << std::endl;
     return CurTok;
 }
+
+
+
+// program -> function program | procedure program | mainfunction
+// function -> prototype variableDeclarBlock ConstDeclarBlock  function_block
+// VariableDeclarBlock - > variableDeclare VariableDeclareBlock | E
+// ConstDeclarBlock - > ConstDeclare ConstDeclareBlock | E
+// VariableDeclare -> VariableName : VariableType
+// ConstDeclare -> ConstName := Value
+//functionbolock -> begin expressions end
+// expressions -> expression expressions | E
+// expressions -> ifelse | identifier | for | while
+// ifelse -> if then expressions else expressions
+// identifier ->
+// numberExpression ->

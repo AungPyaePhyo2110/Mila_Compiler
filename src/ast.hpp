@@ -94,7 +94,7 @@ class UnaryOperationASTNode : public ExprASTNode
       m_operator(op),m_expr(std::move(expression)) {}
     llvm::Value * codegen(GenContext & gen) const override;
     virtual void print(int level =0) const override;
-}
+};
 
 
 class BinaryOperationASTNode : public ExprASTNode
@@ -131,6 +131,18 @@ public:
   virtual void print(int level = 0) const override;
 };
 
+class WhileASTNode : public ExprASTNode
+{
+  std::unique_ptr<ExprASTNode> m_condition;
+  std::unique_ptr<ASTNode> m_body;
+  public:
+  WhileASTNode(std::unique_ptr<ExprASTNode> condition , std::unique_ptr<ASTNode> body)
+              : m_condition(std::move(condition)) , m_body (std::move(body)) {}
+  llvm::Value * codegen(GenContext & gen) const override;
+  virtual void print(int level = 0) const override;
+  
+
+};
 
 
 class IfElseASTNode : public ExprASTNode
@@ -144,6 +156,14 @@ class IfElseASTNode : public ExprASTNode
   virtual void print(int level = 0) const override;
   virtual llvm::Value * codegen(GenContext & gen) const override;
     
+};
+
+class FunctionExitASTNode : public ExprASTNode
+{
+  public:
+    FunctionExitASTNode() {}
+    virtual void print(int level = 0) const override;
+    virtual llvm::Value * codegen(GenContext & gen) const override;
 };
 
 

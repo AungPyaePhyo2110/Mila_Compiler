@@ -57,6 +57,9 @@
         "deque": "cpp",
         "queue": "cpp",
         "shared_mutex": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "iomanip": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp"
     }
 }

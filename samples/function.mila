@@ -1,0 +1,15 @@
+program functiontest;
+
+function isodd(n: integer): integer;
+begin
+    if n > 0 then
+    begin
+        isodd := 1;
+        exit;
+    end;
+    isodd := 0;
+end;
+
+begin
+    writeln(isodd(11));
+end.

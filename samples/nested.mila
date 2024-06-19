@@ -1,0 +1,18 @@
+program nested;
+
+function fibonacci(n : integer) : integer;
+begin
+    if n < 3 then
+        if n < 1 then
+            fibonacci := 0
+        else
+            fibonacci := 2 
+    else
+        fibonacci := 3
+end;
+
+begin
+    writeln(fibonacci(0));
+    writeln(fibonacci(2));
+    writeln(fibonacci(4));
+end.
