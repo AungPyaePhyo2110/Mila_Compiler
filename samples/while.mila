@@ -1,0 +1,8 @@
+program whiletest;
+
+var n : integer;
+begin
+    n := 3;
+    while n > 2 do 
+        n := n - 1;
+end;

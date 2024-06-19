@@ -20,10 +20,11 @@
 #include <iostream>
 
 static std::map<int, std::string> tokenMap = {
+    { ':' , ":" },
     {'*', "*"},
     {')', ")"},
     {'(', "("},
-    {';', "semi_colon"},
+    {';', ";"},
     {61, "equal_token"},
     {-1, "tok_eof"},
     {-2, "tok_identifier"},
@@ -44,7 +45,11 @@ static std::map<int, std::string> tokenMap = {
     {-17, "tok_integer"},
     {-18, "tok_for"},
     {-19, "tok_do"},
+    { -20 , "tok_notequal"},
+    { -21 , "tok_lessequal"},
+    { -22 , "tok_greaterequal"},
     {-23, "tok_assign"},
+    { -24 , "tok_or"},
     {-25, "tok_mod"},
     {-26, "tok_div"},
     {-27, "tok_not"},
@@ -56,17 +61,20 @@ static std::map<int, std::string> tokenMap = {
     {-33, "tok_readln"}};
 
 static std::map<int, int> BinopPrecedence =
-    {   
-        {'=',5},
-        {'<', 10},
-        {'>', 10},
-        {tok_greaterequal, 10},
-        {tok_lessequal, 10},
-        {'+', 20},
-        {'-', 20},
-        {'*', 30},
-        {tok_div, 30},
-        {tok_mod, 30},
+    {
+        { tok_or , 20 },
+        { tok_and , 30 },
+        {  '=' , 40 },
+        { tok_notequal , 40},
+        {'<', 50},
+        {'>', 50},
+        {tok_greaterequal, 50},
+        {tok_lessequal, 50},
+        {'+', 60},
+        {'-', 60},
+        {'*', 70},
+        {tok_div, 70},
+        {tok_mod, 70},
 };
 
 class Parser
@@ -93,7 +101,7 @@ private:
     std::unique_ptr<ExprASTNode> parseIfElseExpression();
 
     std::unique_ptr<ConstantDeclarationASTNode> parseConstantDeclaration();
-    std::unique_ptr<VariableDeclarationASTNode> parseVariableDeclaration();
+void parseVariableDeclaration(std::vector<std::unique_ptr<VariableDeclarationASTNode>> &statements);
     std::unique_ptr<VariableASTNode> parseVariable();
     std::unique_ptr<NumberASTNode> parseNumber();
     std::unique_ptr<ProgramASTNode> parseProgram();
@@ -110,8 +118,8 @@ private:
     int GetTokPrecedence();
     std::unique_ptr<ExprASTNode> ParseBinOpRHS(int ExprPrec, std::unique_ptr<ExprASTNode> LHS);
     std::unique_ptr<ExprASTNode> parseExpressionLines();
-std::unique_ptr<FunctionExitASTNode> parseFunctionExit();
-
+    std::unique_ptr<FunctionExitASTNode> parseFunctionExit();
+    std::unique_ptr<WhileASTNode> parseWhile();
 
     Lexer m_Lexer; // lexer is used to read tokens
     int CurTok;    // to keep the current token

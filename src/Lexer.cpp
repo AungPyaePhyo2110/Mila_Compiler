@@ -35,6 +35,9 @@ Start:
         case '+':
             std::cin.get();
             return '+';
+        case ',':
+            std::cin.get();
+            return ',';
         case '.':
             std::cin.get();
             return '.';
@@ -111,7 +114,7 @@ LessThan:
     }
     return '<';
 Word:
-    if(isalnum(std::cin.peek()))
+    if(isalnum(std::cin.peek()) || std::cin.peek() == '_')
     {
         word += std::cin.get();
         goto Word;
