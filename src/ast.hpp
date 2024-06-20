@@ -15,6 +15,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
 #include <map>
+#include <stack>
 
 #include <vector>
 using SymbolTable = std::map<std::string, llvm::Value *>;
@@ -30,7 +31,7 @@ public:
   llvm::Module MilaModule;       // llvm module
   SymbolTable symbolTable;
   llvm::BasicBlock *endBlock = nullptr;
-  llvm::BasicBlock *whileContinueBlock = nullptr;
+  std::stack<llvm::BasicBlock *> ContinueBlock;
   ConstantValueTable constantTable;
 };
 
@@ -150,6 +151,19 @@ public:
   virtual void print(int level = 0) const override;
 };
 
+class VariableDeclarationASTNode;
+
+class ForASTNode : public ExprASTNode
+{
+  std::unique_ptr<ExprASTNode> m_condition;
+  std::unique_ptr<ASTNode> m_body;
+  public:
+    ForASTNode(std::vector<std::unique_ptr<VariableDeclarationASTNode>> initial , std::unique_ptr<ExprASTNode> condition , std::unique_ptr<ASTNode> body)
+      : m_condition(std::move(condition)),m_body(std::move(body)) {}
+    llvm::Value * codegen(GenContext & gen ) const override;
+    virtual void print(int level = 0) const override;
+};
+
 class WhileASTNode : public ExprASTNode
 {
   std::unique_ptr<ExprASTNode> m_condition;
@@ -173,6 +187,14 @@ public:
       : m_condition(std::move(condition)), m_then(std::move(then)), m_else(std::move(elsebranch)) {}
   virtual void print(int level = 0) const override;
   virtual llvm::Value *codegen(GenContext &gen) const override;
+};
+
+class BreakASTNode : public ExprASTNode
+{
+  public:
+    BreakASTNode() {}
+    virtual void print(int level = 0 ) const override;
+    virtual llvm::Value * codegen(GenContext & gen) const override;
 };
 
 class FunctionExitASTNode : public ExprASTNode

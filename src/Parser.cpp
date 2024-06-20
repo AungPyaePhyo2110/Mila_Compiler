@@ -225,7 +225,7 @@ std::unique_ptr<ExprASTNode> Parser::parseIfElseExpression()
     if (CurTok == tok_begin)
     {
         then = parseMainFunctionBlock();
-        getNextToken(); // eat ;
+        if(CurTok == ';') getNextToken(); // eat ;
     }
     else
         then = parseExpressionLines();
@@ -243,6 +243,12 @@ std::unique_ptr<ExprASTNode> Parser::parseIfElseExpression()
     return std::make_unique<IfElseASTNode>(std::move(condition), std::move(then), std::move(elseBranch));
 }
 
+std::unique_ptr<BreakASTNode> Parser::parseBreak()
+{
+    getNextToken(); // eat break
+    return std::make_unique<BreakASTNode>();
+}
+
 std::unique_ptr<FunctionExitASTNode> Parser::parseFunctionExit()
 {
     getNextToken(); // eat exit
@@ -253,17 +259,23 @@ std::unique_ptr<FunctionExitASTNode> Parser::parseFunctionExit()
 
 std::unique_ptr<WhileASTNode> Parser::parseWhile()
 {
+
+
     getNextToken(); // eat while
     std::unique_ptr<ExprASTNode> condition = parseExpression();
     getNextToken(); // eat do
     std::unique_ptr<ASTNode> body = nullptr;
     if (CurTok == tok_begin)
     {
+        
         body = parseMainFunctionBlock();
+
         if(CurTok == ';') getNextToken(); // eat ;
     }
     else
         body = parseExpressionLines();
+
+    
 
     return std::make_unique<WhileASTNode>(std::move(condition), std::move(body));
 }
@@ -280,10 +292,13 @@ std::unique_ptr<ExprASTNode> Parser::parseExpressionLines()
         return parseFunctionExit();
     case tok_while:
         return parseWhile();
+    case tok_break:
+        return parseBreak();
     default:
         return nullptr;
     }
 }
+
 
 std::unique_ptr<BlockStatmentASTNode> Parser::parseMainFunctionBlock()
 {
@@ -455,6 +470,7 @@ std::unique_ptr<FunctionASTNode> Parser::parseMainFunction()
     }
     std::unique_ptr<BlockStatmentASTNode> mainBlock = parseMainFunctionBlock();
     getNextToken(); // eat .
+
 
     return std::make_unique<FunctionASTNode>(std::move(prototype), std::move(variables), std::move(constants), std::move(mainBlock));
 }

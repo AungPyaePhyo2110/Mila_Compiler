@@ -168,6 +168,8 @@ Word:
         return tok_for;
     else if ( word == "do" )
         return tok_do;
+    else if ( word == "break")
+        return tok_break;
     else
     {
         m_IdentifierStr = word;

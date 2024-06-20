@@ -164,17 +164,28 @@ void VariableDeclarationASTNode::print(int level) const
         m_value->print(level + 1);
 }
 
+void BreakASTNode::print(int level)const
+{
+    printIndent(level);
+    std::cout << "Break AST Node " << std::endl;
+}
+
 void FunctionExitASTNode::print(int level) const
 {
     printIndent(level);
     std::cout << "Function Exit Node " << std::endl;
 }
 
+llvm::Value * BreakASTNode::codegen(GenContext & gen) const
+{
+    llvm::Value * returnValue = gen.MilaBuilder.CreateBr(gen.ContinueBlock.top());
+    gen.ContinueBlock.pop();
+    return returnValue;
+}
+
 llvm::Value *FunctionExitASTNode::codegen(GenContext &gen) const
 {
-    llvm::Function *TheFunction = gen.MilaBuilder.GetInsertBlock()->getParent();
-    gen.MilaBuilder.CreateBr(gen.endBlock);
-    return nullptr;
+    return gen.MilaBuilder.CreateBr(gen.endBlock);
 }
 
 llvm::Value *UnaryOperationASTNode::codegen(GenContext &gen) const
@@ -191,7 +202,7 @@ llvm::Value *UnaryOperationASTNode::codegen(GenContext &gen) const
 llvm::Value * IncrementExprASTNode::codegen(GenContext&gen) const
 {
     llvm::Value * LHS = m_variable->codegen(gen);
-    llvm::Value * incrementValue = gen.MilaBuilder.CreateAdd(LHS,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(32,1)));
+    llvm::Value * incrementValue = gen.MilaBuilder.CreateAdd(LHS,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(32,1)),"inc");
     gen.MilaBuilder.CreateStore(incrementValue,m_variable->getStore(gen));
     return nullptr;
 }
@@ -199,7 +210,7 @@ llvm::Value * IncrementExprASTNode::codegen(GenContext&gen) const
 llvm::Value * DecrementExprASTNode::codegen(GenContext&gen) const
 {
     llvm::Value * LHS = m_variable->codegen(gen);
-    llvm::Value * incrementValue = gen.MilaBuilder.CreateSub(LHS,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(32,1)));
+    llvm::Value * incrementValue = gen.MilaBuilder.CreateSub(LHS,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(32,1)),"dec");
     gen.MilaBuilder.CreateStore(incrementValue,m_variable->getStore(gen));
     return nullptr;
 }
@@ -292,7 +303,9 @@ llvm::Value *VariableASTNode::codePtrGen(GenContext &gen) const
 llvm::Value *VariableASTNode::codegen(GenContext &gen) const
 {
     if (gen.symbolTable.count(m_identifier) <= 0 && gen.constantTable.count(m_identifier) <= 0)
-        throw std::logic_error("variable not defined");
+    {
+        throw std::logic_error("variable not defined" );
+    }
     if (gen.constantTable.count(m_identifier) > 0)
     {
         return gen.constantTable[m_identifier];
@@ -506,11 +519,10 @@ llvm::Value *FunctionCallExprASTNode::codegen(GenContext &gen) const
 
 llvm::Value *WhileASTNode::codegen(GenContext &gen) const
 {
-    gen.whileContinueBlock = nullptr;
     llvm::Function *TheFunction = gen.MilaBuilder.GetInsertBlock()->getParent();
     llvm::BasicBlock *conditionBB = llvm::BasicBlock::Create(gen.MilaContext, "whileCond", TheFunction);
     llvm::BasicBlock *whileContinueBB = llvm::BasicBlock::Create(gen.MilaContext, "merge: ", TheFunction);
-    gen.whileContinueBlock = whileContinueBB;
+    gen.ContinueBlock.push(whileContinueBB);
     gen.MilaBuilder.CreateBr(conditionBB);
     gen.MilaBuilder.SetInsertPoint(conditionBB);
     llvm::Value *condition = m_condition->codegen(gen);

@@ -2,7 +2,20 @@ program whiletest;
 
 var n : integer;
 begin
-    n := 3;
-    while n > 2 do 
-        n := n - 1;
-end;
+    n := 8;
+    while n > 2 do
+    begin 
+        while n > 3 do
+        begin
+            dec(n);
+            if n = 4 then
+                break;
+        end
+        if n = 4 then
+        begin
+            n := 3;
+            break;
+        end
+    end
+    writeln(n);
+end.

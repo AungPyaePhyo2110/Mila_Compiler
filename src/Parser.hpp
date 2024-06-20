@@ -20,7 +20,7 @@
 #include <iostream>
 
 static std::map<int, std::string> tokenMap = {
-    { ':' , ":" },
+    {':', ":"},
     {'*', "*"},
     {')', ")"},
     {'(', "("},
@@ -45,11 +45,11 @@ static std::map<int, std::string> tokenMap = {
     {-17, "tok_integer"},
     {-18, "tok_for"},
     {-19, "tok_do"},
-    { -20 , "tok_notequal"},
-    { -21 , "tok_lessequal"},
-    { -22 , "tok_greaterequal"},
+    {-20, "tok_notequal"},
+    {-21, "tok_lessequal"},
+    {-22, "tok_greaterequal"},
     {-23, "tok_assign"},
-    { -24 , "tok_or"},
+    {-24, "tok_or"},
     {-25, "tok_mod"},
     {-26, "tok_div"},
     {-27, "tok_not"},
@@ -62,10 +62,10 @@ static std::map<int, std::string> tokenMap = {
 
 static std::map<int, int> BinopPrecedence =
     {
-        { tok_or , 20 },
-        { tok_and , 30 },
-        {  '=' , 40 },
-        { tok_notequal , 40},
+        {tok_or, 20},
+        {tok_and, 30},
+        {'=', 40},
+        {tok_notequal, 40},
         {'<', 50},
         {'>', 50},
         {tok_greaterequal, 50},
@@ -99,9 +99,10 @@ private:
     std::unique_ptr<PrototypeASTNode> parseProtoType();
     std::unique_ptr<VariableDeclarationASTNode> parseReturnValue();
     std::unique_ptr<ExprASTNode> parseIfElseExpression();
+    std::unique_ptr<BreakASTNode> parseBreak();
 
     std::unique_ptr<ConstantDeclarationASTNode> parseConstantDeclaration();
-void parseVariableDeclaration(std::vector<std::unique_ptr<VariableDeclarationASTNode>> &statements);
+    void parseVariableDeclaration(std::vector<std::unique_ptr<VariableDeclarationASTNode>> &statements);
     std::unique_ptr<VariableASTNode> parseVariable();
     std::unique_ptr<NumberASTNode> parseNumber();
     std::unique_ptr<ProgramASTNode> parseProgram();
