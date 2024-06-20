@@ -280,14 +280,35 @@ std::unique_ptr<WhileASTNode> Parser::parseWhile()
     return std::make_unique<WhileASTNode>(std::move(condition), std::move(body));
 }
 
+std::unique_ptr<ForASTNode> Parser::parseForExpression()
+{
+    getNextToken(); // eat for
+    std::string identifier = m_Lexer.identifierStr();
+    getNextToken(); // eat identifier
+    std::unique_ptr<ExprASTNode> assignment = parseAssignemntExpression(identifier);
+    ForASTNode::Type type = ForASTNode::Type::TO;
+    if(CurTok == tok_downto) type = ForASTNode::Type::DOWNTO;
+    getNextToken(); // down to or to
+    std::unique_ptr<ExprASTNode> expression = parseExpression();
+    getNextToken(); // eat do
+    std::unique_ptr<ASTNode> body = nullptr;
+    if(CurTok == tok_begin) body = parseMainFunctionBlock();
+    else body = parseExpression();
+
+
+    return std::make_unique<ForASTNode>(identifier,std::move(assignment),type,std::move(expression),std::move(body));
+}
+
 std::unique_ptr<ExprASTNode> Parser::parseExpressionLines()
 {
     switch (CurTok)
     {
     case tok_if:
         return parseIfElseExpression();
+    case tok_for:
+        return parseForExpression();
     case tok_identifier:
-        return parseIdentiferExpression();
+        return parseExpression();
     case tok_exit:
         return parseFunctionExit();
     case tok_while:
@@ -303,7 +324,6 @@ std::unique_ptr<ExprASTNode> Parser::parseExpressionLines()
 std::unique_ptr<BlockStatmentASTNode> Parser::parseMainFunctionBlock()
 {
     getNextToken(); // eat begin
-
     std::vector<std::unique_ptr<ExprASTNode>> expressions;
     while (CurTok != tok_end)
     {
@@ -313,6 +333,7 @@ std::unique_ptr<BlockStatmentASTNode> Parser::parseMainFunctionBlock()
             getNextToken(); // eat ;
     }
     getNextToken(); // eat end
+    
     return std::make_unique<BlockStatmentASTNode>(std::move(expressions));
 }
 

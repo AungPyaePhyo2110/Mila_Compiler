@@ -21,6 +21,15 @@ void WhileASTNode::print(int level) const
     m_body->print(level + 1);
 }
 
+void ForASTNode::print(int level) const
+{
+    printIndent(level);
+    std::cout << "For Node" << std::endl;
+    m_assign->print(level+1);
+    m_expr->print(level+1);
+    m_body->print(level+1);
+}
+
 void UnaryOperationASTNode::print(int level) const
 {
     printIndent(level);
@@ -517,11 +526,41 @@ llvm::Value *FunctionCallExprASTNode::codegen(GenContext &gen) const
     return gen.MilaBuilder.CreateCall(calleeF, argsV, m_callee);
 }
 
+llvm::Value * ForASTNode::codegen(GenContext & gen) const
+{
+    llvm::Function * TheFunction = gen.MilaBuilder.GetInsertBlock()->getParent();
+    llvm::BasicBlock * conditionBB = llvm::BasicBlock::Create(gen.MilaContext , "forCond" , TheFunction);
+    llvm::BasicBlock * forContinueBB = llvm::BasicBlock::Create(gen.MilaContext , "forContinue" , TheFunction);
+    gen.ContinueBlock.push(forContinueBB);
+    m_assign->codegen(gen);
+    gen.MilaBuilder.CreateBr(conditionBB);
+    gen.MilaBuilder.SetInsertPoint(conditionBB);
+    if(gen.symbolTable.count(m_variable) <= 0 )return nullptr;
+    llvm::Value * variable = gen.MilaBuilder.CreateLoad(llvm::Type::getInt32Ty(gen.MilaContext),gen.symbolTable[m_variable],m_variable);
+    llvm::Value * condition = nullptr;
+    llvm::Value * RHS = m_expr->codegen(gen);
+    if(m_type == TO) condition = gen.MilaBuilder.CreateICmpSLE(variable,RHS,"condition");
+    else condition = gen.MilaBuilder.CreateICmpSGE(variable,RHS,"condition");
+    condition = gen.MilaBuilder.CreateICmpNE(condition,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(1,0)) , "forCond");
+    llvm::BasicBlock * forBodyBB = llvm::BasicBlock::Create(gen.MilaContext ,"forbody",TheFunction);
+    gen.MilaBuilder.CreateCondBr(condition,forBodyBB,forContinueBB);
+    gen.MilaBuilder.SetInsertPoint(forBodyBB);
+    m_body->codegen(gen);
+    llvm::Value * afterForBody = nullptr;
+    if(m_type == TO ) afterForBody = gen.MilaBuilder.CreateAdd(variable,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(32,1)),"AfterForBody");
+    else afterForBody = gen.MilaBuilder.CreateSub(variable,llvm::ConstantInt::get(gen.MilaContext,llvm::APInt(32,1)),"AfterForBody");
+    gen.MilaBuilder.CreateStore(afterForBody,gen.symbolTable[m_variable]);
+    gen.MilaBuilder.CreateBr(conditionBB);
+    gen.MilaBuilder.SetInsertPoint(forContinueBB);
+
+    return nullptr;
+}
+
 llvm::Value *WhileASTNode::codegen(GenContext &gen) const
 {
     llvm::Function *TheFunction = gen.MilaBuilder.GetInsertBlock()->getParent();
     llvm::BasicBlock *conditionBB = llvm::BasicBlock::Create(gen.MilaContext, "whileCond", TheFunction);
-    llvm::BasicBlock *whileContinueBB = llvm::BasicBlock::Create(gen.MilaContext, "merge: ", TheFunction);
+    llvm::BasicBlock *whileContinueBB = llvm::BasicBlock::Create(gen.MilaContext, "merge", TheFunction);
     gen.ContinueBlock.push(whileContinueBB);
     gen.MilaBuilder.CreateBr(conditionBB);
     gen.MilaBuilder.SetInsertPoint(conditionBB);
@@ -529,7 +568,7 @@ llvm::Value *WhileASTNode::codegen(GenContext &gen) const
     if (!condition)
         return nullptr;
     condition = gen.MilaBuilder.CreateICmpNE(condition, llvm::ConstantInt::get(gen.MilaContext, llvm::APInt(1, 0)), "whileCond");
-    llvm::BasicBlock *whileBodyBB = llvm::BasicBlock::Create(gen.MilaContext, "body: ", TheFunction);
+    llvm::BasicBlock *whileBodyBB = llvm::BasicBlock::Create(gen.MilaContext, "whilebody", TheFunction);
     gen.MilaBuilder.CreateCondBr(condition, whileBodyBB, whileContinueBB);
     gen.MilaBuilder.SetInsertPoint(whileBodyBB);
     m_body->codegen(gen);

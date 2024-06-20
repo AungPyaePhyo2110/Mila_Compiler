@@ -62,6 +62,7 @@ static std::map<int, std::string> tokenMap = {
 
 static std::map<int, int> BinopPrecedence =
     {
+        {tok_assign , 10},
         {tok_or, 20},
         {tok_and, 30},
         {'=', 40},
@@ -116,6 +117,7 @@ private:
     std::unique_ptr<ExprASTNode> parsePrimary();
     std::unique_ptr<ExprASTNode> parseNumberExpression();
     std::unique_ptr<ExprASTNode> parseParentheseExpression();
+    std::unique_ptr<ForASTNode> parseForExpression();
     int GetTokPrecedence();
     std::unique_ptr<ExprASTNode> ParseBinOpRHS(int ExprPrec, std::unique_ptr<ExprASTNode> LHS);
     std::unique_ptr<ExprASTNode> parseExpressionLines();

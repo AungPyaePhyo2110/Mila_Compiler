@@ -1,0 +1,13 @@
+program fortest;
+
+var I : integer;
+begin
+  for I := 0 to 20 do 
+  begin
+    writeln(I);
+  end;
+  for I := 20 downto 0 do
+  begin
+    writeln(I);
+    end;
+end.

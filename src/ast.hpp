@@ -115,19 +115,21 @@ public:
 class IncrementExprASTNode : public ExprASTNode
 {
   std::unique_ptr<VariableASTNode> m_variable;
-  public:
-    IncrementExprASTNode(std::unique_ptr<VariableASTNode> variable) : m_variable(std::move(variable)) {}
-    virtual void print(int level = 0) const override;
-    llvm::Value * codegen(GenContext & gen) const override;
+
+public:
+  IncrementExprASTNode(std::unique_ptr<VariableASTNode> variable) : m_variable(std::move(variable)) {}
+  virtual void print(int level = 0) const override;
+  llvm::Value *codegen(GenContext &gen) const override;
 };
 
 class DecrementExprASTNode : public ExprASTNode
 {
   std::unique_ptr<VariableASTNode> m_variable;
-  public:
-    DecrementExprASTNode(std::unique_ptr<VariableASTNode> variable) : m_variable(std::move(variable)) {}
-    virtual void print(int level = 0) const override;
-    llvm::Value * codegen(GenContext & gen) const override;
+
+public:
+  DecrementExprASTNode(std::unique_ptr<VariableASTNode> variable) : m_variable(std::move(variable)) {}
+  virtual void print(int level = 0) const override;
+  llvm::Value *codegen(GenContext &gen) const override;
 };
 
 class ReadlnExprASTNode : public ExprASTNode
@@ -155,13 +157,24 @@ class VariableDeclarationASTNode;
 
 class ForASTNode : public ExprASTNode
 {
-  std::unique_ptr<ExprASTNode> m_condition;
+
+public:
+  enum Type
+  {
+    TO,
+    DOWNTO
+  };
+  ForASTNode(std::string variable, std::unique_ptr<ExprASTNode> assign, Type type, std::unique_ptr<ExprASTNode> expr, std::unique_ptr<ASTNode> body)
+      : m_variable(variable), m_assign(std::move(assign)), m_type(type), m_expr(std::move(expr)), m_body(std::move(body)) {}
+  llvm::Value *codegen(GenContext &gen) const override;
+  virtual void print(int level = 0) const override;
+
+private:
+  std::string m_variable;
+  std::unique_ptr<ExprASTNode> m_assign;
+  Type m_type;
+  std::unique_ptr<ExprASTNode> m_expr;
   std::unique_ptr<ASTNode> m_body;
-  public:
-    ForASTNode(std::vector<std::unique_ptr<VariableDeclarationASTNode>> initial , std::unique_ptr<ExprASTNode> condition , std::unique_ptr<ASTNode> body)
-      : m_condition(std::move(condition)),m_body(std::move(body)) {}
-    llvm::Value * codegen(GenContext & gen ) const override;
-    virtual void print(int level = 0) const override;
 };
 
 class WhileASTNode : public ExprASTNode
@@ -191,10 +204,10 @@ public:
 
 class BreakASTNode : public ExprASTNode
 {
-  public:
-    BreakASTNode() {}
-    virtual void print(int level = 0 ) const override;
-    virtual llvm::Value * codegen(GenContext & gen) const override;
+public:
+  BreakASTNode() {}
+  virtual void print(int level = 0) const override;
+  virtual llvm::Value *codegen(GenContext &gen) const override;
 };
 
 class FunctionExitASTNode : public ExprASTNode
